@@ -1,8 +1,15 @@
 # ml_models.py
+
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_curve, auc
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import (
+    classification_report,
+    confusion_matrix,
+    accuracy_score,
+    roc_curve,
+    auc,
+)
+from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 from sklearn.svm import SVC
 from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import SMOTE
@@ -44,11 +51,13 @@ def original_version_train(X, y):
 
     rf = RandomForestClassifier(random_state=42)
     svm_clf = SVC(random_state=42, probability=True)
+    et = ExtraTreesClassifier(random_state=42)
 
     rf.fit(X_train, y_train)
     svm_clf.fit(X_train, y_train)
+    et.fit(X_train, y_train)
 
-    evaluate_models(rf, svm_clf, X_test, y_test)
+    evaluate_models(rf, svm_clf, et, X_test, y_test)
 
 
 def smote_train(X, y):
@@ -62,11 +71,13 @@ def smote_train(X, y):
 
     rf = RandomForestClassifier(random_state=42)
     svm_clf = SVC(random_state=42, probability=True)
+    et = ExtraTreesClassifier(random_state=42)
 
     rf.fit(X_train, y_train)
     svm_clf.fit(X_train, y_train)
+    et.fit(X_train, y_train)
 
-    evaluate_models(rf, svm_clf, X_test, y_test)
+    evaluate_models(rf, svm_clf, et, X_test, y_test)
 
 
 def classweight_train(X, y):
@@ -77,11 +88,13 @@ def classweight_train(X, y):
 
     rf = RandomForestClassifier(class_weight='balanced', random_state=42)
     svm_clf = SVC(class_weight='balanced', random_state=42, probability=True)
+    et = ExtraTreesClassifier(class_weight='balanced', random_state=42)
 
     rf.fit(X_train, y_train)
     svm_clf.fit(X_train, y_train)
+    et.fit(X_train, y_train)
 
-    evaluate_models(rf, svm_clf, X_test, y_test)
+    evaluate_models(rf, svm_clf, et, X_test, y_test)
 
 
 def smote_and_classweight_train(X, y):
@@ -95,16 +108,19 @@ def smote_and_classweight_train(X, y):
 
     rf = RandomForestClassifier(class_weight='balanced', random_state=42)
     svm_clf = SVC(class_weight='balanced', random_state=42, probability=True)
+    et = ExtraTreesClassifier(class_weight='balanced', random_state=42)
 
     rf.fit(X_train, y_train)
     svm_clf.fit(X_train, y_train)
+    et.fit(X_train, y_train)
 
-    evaluate_models(rf, svm_clf, X_test, y_test)
+    evaluate_models(rf, svm_clf, et, X_test, y_test)
 
 
-def evaluate_models(rf, svm_clf, X_test, y_test):
+def evaluate_models(rf, svm_clf, et, X_test, y_test):
     y_pred_rf = rf.predict(X_test)
     y_pred_svm = svm_clf.predict(X_test)
+    y_pred_et = et.predict(X_test)
 
     print("RF Accuracy:", accuracy_score(y_test, y_pred_rf))
     print("RF Confusion Matrix:\n", confusion_matrix(y_test, y_pred_rf))
@@ -114,8 +130,14 @@ def evaluate_models(rf, svm_clf, X_test, y_test):
     print("SVM Confusion Matrix:\n", confusion_matrix(y_test, y_pred_svm))
     print("SVM Classification Report:\n", classification_report(y_test, y_pred_svm))
 
+    print("\nExtra Trees Accuracy:", accuracy_score(y_test, y_pred_et))
+    print("Extra Trees Confusion Matrix:\n", confusion_matrix(y_test, y_pred_et))
+    print("Extra Trees Classification Report:\n", classification_report(y_test, y_pred_et))
+
     save_confusion_matrix(y_test, y_pred_rf, "Random Forest", "rf_confusion_matrix.png")
     save_confusion_matrix(y_test, y_pred_svm, "SVM", "svm_confusion_matrix.png")
+    save_confusion_matrix(y_test, y_pred_et, "Extra Trees", "et_confusion_matrix.png")
 
     save_roc_curve(y_test, rf.predict_proba(X_test)[:, 1], "Random Forest", "rf_roc_curve.png")
     save_roc_curve(y_test, svm_clf.predict_proba(X_test)[:, 1], "SVM", "svm_roc_curve.png")
+    save_roc_curve(y_test, et.predict_proba(X_test)[:, 1], "Extra Trees", "et_roc_curve.png")
