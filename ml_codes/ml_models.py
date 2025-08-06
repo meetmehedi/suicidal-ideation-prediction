@@ -9,13 +9,25 @@ from sklearn.metrics import (
     roc_curve,
     auc,
 )
-from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
-from sklearn.svm import SVC
 from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import SMOTE
 from sklearn.preprocessing import label_binarize
 
+# Core Models (1 per category)
+from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.svm import SVC
+from sklearn.linear_model import LogisticRegression
+from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+from sklearn.neural_network import MLPClassifier
 
+from xgboost import XGBClassifier
+from pytorch_tabnet.tab_model import TabNetClassifier
+
+import numpy as np
+import torch
+
+
+# ------------------------- Confusion Matrix Plot -------------------------
 def save_confusion_matrix(y_true, y_pred, model_name, filename):
     cm = confusion_matrix(y_true, y_pred)
     plt.figure(figsize=(6, 5))
@@ -27,6 +39,7 @@ def save_confusion_matrix(y_true, y_pred, model_name, filename):
     plt.close()
 
 
+# ------------------------- ROC Curve Plot -------------------------
 def save_roc_curve(y_true, y_proba, model_name, filename):
     y_true_bin = label_binarize(y_true, classes=[1, 2]).ravel()
     fpr, tpr, _ = roc_curve(y_true_bin, y_proba)
@@ -43,23 +56,7 @@ def save_roc_curve(y_true, y_proba, model_name, filename):
     plt.close()
 
 
-def original_version_train(X, y):
-    print("\n[Original Version: No SMOTE, No Class Weight]\n")
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
-
-    rf = RandomForestClassifier(random_state=42)
-    svm_clf = SVC(random_state=42, probability=True)
-    et = ExtraTreesClassifier(random_state=42)
-
-    rf.fit(X_train, y_train)
-    svm_clf.fit(X_train, y_train)
-    et.fit(X_train, y_train)
-
-    evaluate_models(rf, svm_clf, et, X_test, y_test)
-
-
+# ------------------------- Train and Evaluate Selected Models -------------------------
 def smote_train(X, y):
     print("\n[SMOTE Version: With SMOTE, No Class Weight]\n")
     smote = SMOTE(random_state=42)
@@ -69,75 +66,44 @@ def smote_train(X, y):
         X_resampled, y_resampled, test_size=0.2, random_state=42, stratify=y_resampled
     )
 
-    rf = RandomForestClassifier(random_state=42)
-    svm_clf = SVC(random_state=42, probability=True)
-    et = ExtraTreesClassifier(random_state=42)
+    # One model per category
+    models = {
+        "Extra Trees": ExtraTreesClassifier(random_state=42),
+        "SVM": SVC(random_state=42, probability=True),
+        "Logistic Regression": LogisticRegression(max_iter=1000, random_state=42),
+        "QDA": QuadraticDiscriminantAnalysis(),
+        "MLP": MLPClassifier(random_state=42, max_iter=1000),
+        "XGBoost": XGBClassifier(random_state=42, use_label_encoder=False, eval_metric='logloss'),
+        "TabNet": TabNetClassifier(verbose=0, seed=42),
+    }
 
-    rf.fit(X_train, y_train)
-    svm_clf.fit(X_train, y_train)
-    et.fit(X_train, y_train)
+    # Fit models (TabNet separately due to numpy requirement)
+    for name, model in models.items():
+        if name == "TabNet":
+            model.fit(
+                X_train.values, y_train.values,
+                eval_set=[(X_test.values, y_test.values)],
+                patience=20,
+                max_epochs=200,
+                batch_size=1024,
+            )
+        else:
+            model.fit(X_train, y_train)
 
-    evaluate_models(rf, svm_clf, et, X_test, y_test)
-
-
-def classweight_train(X, y):
-    print("\n[Class Weight Version: No SMOTE, With Class Weight]\n")
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
-
-    rf = RandomForestClassifier(class_weight='balanced', random_state=42)
-    svm_clf = SVC(class_weight='balanced', random_state=42, probability=True)
-    et = ExtraTreesClassifier(class_weight='balanced', random_state=42)
-
-    rf.fit(X_train, y_train)
-    svm_clf.fit(X_train, y_train)
-    et.fit(X_train, y_train)
-
-    evaluate_models(rf, svm_clf, et, X_test, y_test)
-
-
-def smote_and_classweight_train(X, y):
-    print("\n[SMOTE + Class Weight Version: With SMOTE and Class Weight]\n")
-    smote = SMOTE(random_state=42)
-    X_resampled, y_resampled = smote.fit_resample(X, y)
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_resampled, y_resampled, test_size=0.2, random_state=42, stratify=y_resampled
-    )
-
-    rf = RandomForestClassifier(class_weight='balanced', random_state=42)
-    svm_clf = SVC(class_weight='balanced', random_state=42, probability=True)
-    et = ExtraTreesClassifier(class_weight='balanced', random_state=42)
-
-    rf.fit(X_train, y_train)
-    svm_clf.fit(X_train, y_train)
-    et.fit(X_train, y_train)
-
-    evaluate_models(rf, svm_clf, et, X_test, y_test)
+    evaluate_models(models, X_test, y_test)
 
 
-def evaluate_models(rf, svm_clf, et, X_test, y_test):
-    y_pred_rf = rf.predict(X_test)
-    y_pred_svm = svm_clf.predict(X_test)
-    y_pred_et = et.predict(X_test)
+# ------------------------- Evaluation -------------------------
+def evaluate_models(models, X_test, y_test):
+    for name, model in models.items():
+        X_input = X_test.values if name == "TabNet" else X_test
+        y_pred = model.predict(X_input)
+        y_proba = model.predict_proba(X_input)[:, 1]
 
-    print("RF Accuracy:", accuracy_score(y_test, y_pred_rf))
-    print("RF Confusion Matrix:\n", confusion_matrix(y_test, y_pred_rf))
-    print("RF Classification Report:\n", classification_report(y_test, y_pred_rf))
+        print(f"\n{name} Accuracy:", accuracy_score(y_test, y_pred))
+        print(f"{name} Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
+        print(f"{name} Classification Report:\n", classification_report(y_test, y_pred))
 
-    print("\nSVM Accuracy:", accuracy_score(y_test, y_pred_svm))
-    print("SVM Confusion Matrix:\n", confusion_matrix(y_test, y_pred_svm))
-    print("SVM Classification Report:\n", classification_report(y_test, y_pred_svm))
-
-    print("\nExtra Trees Accuracy:", accuracy_score(y_test, y_pred_et))
-    print("Extra Trees Confusion Matrix:\n", confusion_matrix(y_test, y_pred_et))
-    print("Extra Trees Classification Report:\n", classification_report(y_test, y_pred_et))
-
-    save_confusion_matrix(y_test, y_pred_rf, "Random Forest", "rf_confusion_matrix.png")
-    save_confusion_matrix(y_test, y_pred_svm, "SVM", "svm_confusion_matrix.png")
-    save_confusion_matrix(y_test, y_pred_et, "Extra Trees", "et_confusion_matrix.png")
-
-    save_roc_curve(y_test, rf.predict_proba(X_test)[:, 1], "Random Forest", "rf_roc_curve.png")
-    save_roc_curve(y_test, svm_clf.predict_proba(X_test)[:, 1], "SVM", "svm_roc_curve.png")
-    save_roc_curve(y_test, et.predict_proba(X_test)[:, 1], "Extra Trees", "et_roc_curve.png")
+        short_name = name.lower().replace(" ", "_")
+        save_confusion_matrix(y_test, y_pred, name, f"{short_name}_confusion_matrix.png")
+        save_roc_curve(y_test, y_proba, name, f"{short_name}_roc_curve.png")
