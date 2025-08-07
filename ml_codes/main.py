@@ -1,22 +1,41 @@
-# main.py
-from data_preprocessing import load_and_preprocess_data
-from ml_models import (
-    smote_train,
-)
+import os
+import pandas as pd
+from data_preprocessing import load_and_preprocess_data, dataset_stats
+from ml_models import smote_train
 
-# Load and preprocess data
-df = load_and_preprocess_data("BGD2014_Public_Use.csv")
+DATA_DIR = "datasets"
+OUTPUT_CSV = "summary_results.csv"
 
-# Split features and target
-X = df.drop(columns=["suicide"])
-y = df["suicide"]
+summary = []
 
-print(f"\nNumber of 1s in suicide column: {y.value_counts().get(1, 0)}")
-print(f"Number of 2s in suicide column: {y.value_counts().get(0, 0)}")
-print(f"Total suicide samples: {len(df)}")
+# Loop through all CSV files in the datasets directory
+for filename in os.listdir(DATA_DIR):
+    if filename.endswith(".csv"):
+        filepath = os.path.join(DATA_DIR, filename)
+        dataset_name = os.path.splitext(filename)[0]
 
-# Train models
+        print(f"\n\n=== Processing Dataset: {dataset_name} ===")
+        
+        # Load, preprocess, and collect stats
+        df, pre_stats, post_stats = load_and_preprocess_data(filepath, return_stats=True)
+        X = df.drop(columns=["suicide"])
+        y = df["suicide"]
 
-print("Starting training with SMOTE version...")
-smote_train(X, y)
+        # Train and evaluate models
+        metrics = smote_train(X, y, return_metrics=True)
 
+        # Combine all into one row
+        row = {
+            "Dataset": dataset_name,
+            **{f"Pre-{k}": v for k, v in pre_stats.items()},
+            **{f"Post-{k}": v for k, v in post_stats.items()},
+        }
+        for model_name, scores in metrics.items():
+            for metric_name, value in scores.items():
+                row[f"{model_name}_{metric_name}"] = value
+
+        summary.append(row)
+
+# Save summary
+pd.DataFrame(summary).to_csv(OUTPUT_CSV, index=False)
+print(f"\nAll results saved to '{OUTPUT_CSV}'")
