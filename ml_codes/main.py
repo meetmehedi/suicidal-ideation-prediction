@@ -1,10 +1,13 @@
 import os
 import pandas as pd
+from datetime import datetime
 from data_preprocessing import load_and_preprocess_data, dataset_stats
 from ml_models import smote_train
 
 DATA_DIR = "datasets"
-OUTPUT_CSV = "summary_results.csv"
+# Generate filename with international datetime format (ISO 8601)
+current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+OUTPUT_CSV = f"summary_results_{current_datetime}.csv"
 
 summary = []
 
@@ -18,6 +21,12 @@ for filename in os.listdir(DATA_DIR):
         
         # Load, preprocess, and collect stats
         df, pre_stats, post_stats = load_and_preprocess_data(filepath, return_stats=True)
+        
+        # Skip dataset if no relevant columns found
+        if df is None:
+            print(f"Skipping dataset {dataset_name} - no relevant columns found")
+            continue
+            
         X = df.drop(columns=["suicide"])
         y = df["suicide"]
 
