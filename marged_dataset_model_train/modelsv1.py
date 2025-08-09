@@ -104,6 +104,6 @@ def evaluate_models(models, X_test, y_test):
         print(f"{name} Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
         print(f"{name} Classification Report:\n", classification_report(y_test, y_pred))
 
-        short_name = name.lower().replace(" ", "_")
-        save_confusion_matrix(y_test, y_pred, name, f"{short_name}_confusion_matrix.png")
-        save_roc_curve(y_test, y_proba, name, f"{short_name}_roc_curve.png")
+        # short_name = name.lower().replace(" ", "_")
+        # save_confusion_matrix(y_test, y_pred, name, f"{short_name}_confusion_matrix.png")
+        # save_roc_curve(y_test, y_proba, name, f"{short_name}_roc_curve.png")

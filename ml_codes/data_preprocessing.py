@@ -1,3 +1,4 @@
+#data_preprocessing.py
 import pandas as pd
 from sklearn.impute import KNNImputer
 
@@ -78,8 +79,13 @@ def load_and_preprocess_data(filepath, return_stats=False):
         for col in all_nan_cols:
             df[col] = 0
     
+    # Impute missing values using KNNImputer
     imputer = KNNImputer(n_neighbors=len(df) - 1)
     df = pd.DataFrame(imputer.fit_transform(df), columns=df.columns)
+
+    # Fill missing values with median for numerical stability
+    # df = df.fillna(df.median())
+
 
     post_stats = dataset_stats(df)
 
@@ -94,7 +100,7 @@ def load_and_preprocess_data(filepath, return_stats=False):
                 result = 1
             if "q25" in df.columns and pd.notna(row["q25"]) and row["q25"] == 1:  # Made a suicide plan
                 result = 1
-            if "q26" in df.columns and pd.notna(row["q26"]) and row["q26"] == 1:  # Attempted suicide (assuming 1 means attempted)
+            if "q26" in df.columns and pd.notna(row["q26"]) and row["q26"] > 1:  # Attempted suicide (assuming 1 means attempted)
                 result = 1
             return result
         
