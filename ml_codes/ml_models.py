@@ -147,9 +147,7 @@ def save_confusion_matrix(y_true, y_pred, model_name, filename):
 
 def save_roc_curve(y_true, y_proba, model_name, filename):
     """Save a ROC curve plot."""
-    # Ensure binary labels are 0/1
-    y_true_bin = label_binarize(y_true, classes=[1, 2]).ravel()
-    fpr, tpr, _ = roc_curve(y_true_bin, y_proba)
+    fpr, tpr, _ = roc_curve(y_true, y_proba)
     roc_auc = auc(fpr, tpr)
 
     plt.figure(figsize=(7, 6))
