@@ -135,6 +135,12 @@ def loadPreprocessTrainMergedDataset(merged_df):
     X = merged_df.drop(columns=["suicide"])
     y = merged_df["suicide"]
 
+    # show basic info about merged_df
+    print(f"\n📊 Dataset States ")
+    print(f"Rows: {merged_df.shape[0]}")
+    print(f"Columns: {merged_df.shape[1]}")
+    print(f"Total Elements: {merged_df.count().sum()}")
+
     trained_models = smote_train(X, y)
 
     # Save Extra Trees model
