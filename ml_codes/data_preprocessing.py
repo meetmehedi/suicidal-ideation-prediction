@@ -33,6 +33,7 @@ targeted_fields = {
     "q54": "Other students kind and helpful",
     "q56": "Parents understand problems",
     "q57": "Parents know about free time",
+    "q58": "Parents go through their things",
 }
 
 
@@ -60,7 +61,8 @@ def load_and_preprocess_data(filepath):
       3. Imputes missing values (KNN)
       4. Creates 'suicide' target variable
     Returns:
-      Preprocessed DataFrame or None if preprocessing is not possible
+      Tuple of (preprocessed DataFrame, stats_dict) or (None, None) if preprocessing is not possible
+      where stats_dict contains pre and post processing statistics
     """
     print(f"\n📂 Loading dataset: {filepath}")
     df = pd.read_csv(filepath)
@@ -86,10 +88,16 @@ def load_and_preprocess_data(filepath):
 
     # Before imputation statistics
     print_dataset_states(df, "Before Imputation")
+    stats = {
+        'Pre-Rows': len(df),
+        'Pre-Columns': len(df.columns),
+        'Pre-Total Elements': df.count().sum(),
+        'Pre-Missing Cells': df.isnull().sum().sum(),
+    }
 
     # Impute missing values using KNN
     try:
-        imputer = KNNImputer(n_neighbors=min(len(df) - 1, 5))  # Avoid too large k
+        imputer = KNNImputer(n_neighbors=len(df) - 1)  # Avoid too large k
         df = pd.DataFrame(imputer.fit_transform(df), columns=df.columns)
     except Exception as e:
         print(f"❌ Error during KNN imputation: {e}")
@@ -131,4 +139,10 @@ def load_and_preprocess_data(filepath):
     print("🆕 'suicide' target column created successfully.")
     print_dataset_states(df, "Final Processed Dataset")
 
-    return df
+    # Collect statistics
+    stats["Post-Rows"] = df.shape[0]
+    stats["Post-Columns"] = df.shape[1]
+    stats["Post-Total Elements"] = df.count().sum()
+    stats["Post-Missing Cells"] = df.isnull().sum().sum()
+
+    return df, stats

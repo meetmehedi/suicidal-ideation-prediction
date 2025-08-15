@@ -45,7 +45,14 @@ def smote_train(X, y, return_metrics=False):
 
     # Before SMOTE
     print(f"Original dataset size: {len(X)}")
+    class_dist = pd.Series(y).value_counts()
     print_class_distribution(y, "Original")
+
+    # Store class distribution
+    metrics_dict = {
+        'Class_0_Samples': int(class_dist.get(0, 0)),
+        'Class_1_Samples': int(class_dist.get(1, 0))
+    }
 
     # Apply SMOTE
     smote = SMOTE(random_state=42)
@@ -103,11 +110,21 @@ def smote_train(X, y, return_metrics=False):
             "Recall": round(recall_score(y_test, y_pred), 4),
             "F1": round(f1_score(y_test, y_pred), 4),
         }
-
+        if name == "ExtraTrees":
+            print(f"Feature Importances for {name}:")
+            importances = pd.Series(model.feature_importances_, index=X_train.columns).sort_values(ascending=False)
+            print(importances)
     print("\nModel training completed.")
     evaluate_models(models, X_test, y_test)
 
-    return (models, model_scores) if return_metrics else models
+    # Add model metrics to metrics_dict (which already has class distribution)
+    for name, scores in model_scores.items():
+        metrics_dict[f"{name}_Accuracy"] = scores["Accuracy"]
+        metrics_dict[f"{name}_Precision"] = scores["Precision"]
+        metrics_dict[f"{name}_Recall"] = scores["Recall"]
+        metrics_dict[f"{name}_F1"] = scores["F1"]
+
+    return (models, metrics_dict) if return_metrics else (models, metrics_dict)
 
 
 def evaluate_models(models, X_test, y_test):

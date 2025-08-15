@@ -15,14 +15,15 @@ DATA_DIR = "datasets"
 current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 OUTPUT_CSV = f"summary_results_{current_datetime}.csv"
 
-# Store evaluation summaries (future use if needed)
-summary = []
+# Store evaluation summaries
+summary_results = []
 
 # Default properties (can be modified by user input)
 PROPERTIES = {
     'merge_datasets': False,
     'save_graphs': True,
     'save_models': True,
+    'save_results': False,
     'model_dir': 'trained_models',
     'graphs_dir': 'model_graphs',
     'save_merged_dataset': False,
@@ -44,25 +45,42 @@ def initialize_properties():
     def ask_yes_no(prompt, default="no"):
         """Ask a yes/no question, return True for yes, False for no."""
         valid = ['yes', 'no', 'y', 'n', '']
-        default_bool = default.lower() in ['yes', 'y']
+
+        # Convert default string to boolean properly
+        if default.lower() in ['yes', 'y']:
+            default_bool = True
+        elif default.lower() in ['no', 'n']:
+            default_bool = False
+        else:
+            default_bool = False  # fallback
 
         while True:
             answer = input(f"{prompt} (yes/no) [{default}]: ").strip().lower()
             if answer in valid:
-                return answer in ['yes', 'y'] if answer else default_bool
-            print("⚠️ Please enter 'yes' or 'y' or 'no' or 'n' or press Enter for default.")
+                if answer == '':
+                    return default_bool
+                return answer in ['yes', 'y']
+            print("⚠️ Please enter 'yes', 'y', 'no', 'n', or press Enter for default.")
+
+    # Initialize PROPERTIES dictionary if not exists
+    global PROPERTIES
+    if 'PROPERTIES' not in globals():
+        PROPERTIES = {}
 
     # Questions
     PROPERTIES['merge_datasets'] = ask_yes_no("Merge datasets?", default="no")
     if PROPERTIES['merge_datasets']:
         print("💡 Merging datasets will increase training time and memory usage.\n")
-        # Ask if they want to save the merged dataset when merging true
         PROPERTIES['save_merged_dataset'] = ask_yes_no("Save merged dataset as CSV?", default="no")
         if PROPERTIES['save_merged_dataset']:
             print("💾 Merged dataset will be saved as 'merged_dataset.csv'.\n")
 
     PROPERTIES['save_graphs'] = ask_yes_no("Save confusion matrix & ROC curve?", default="yes")
     PROPERTIES['save_models'] = ask_yes_no("Save model as .pkl file?", default="yes")
+    PROPERTIES['save_results'] = ask_yes_no("Save results to CSV file?", default="yes")
+    if PROPERTIES['save_results']:
+        print("💾 Results will be saved in 'summary_results_[datetime].csv'.\n")
+
 
 
 
@@ -84,7 +102,7 @@ def loadPreprocessTrain():
 
             print("\n" + "="*20 + f" Processing Dataset: {dataset_name} " + "="*20)
             # Load and preprocess
-            df = load_and_preprocess_data(filepath)
+            df, stats = load_and_preprocess_data(filepath)
             if df is None:
                 print(f"⚠️ Skipping {dataset_name} - no relevant columns found.")
                 continue
@@ -102,7 +120,14 @@ def loadPreprocessTrain():
 
             # Train models
             print("\n" + "="*20 + f" Training Models for : {dataset_name} " + "="*20)
-            trained_models = smote_train(X, y)
+            trained_models, model_scores = smote_train(X, y, return_metrics=True)
+
+            # Store results
+            if PROPERTIES['save_results']:
+                result_row = {"Dataset_Name": dataset_name}
+                result_row.update(stats)
+                result_row.update(model_scores)
+                summary_results.append(result_row)
 
             # Save only Extra Trees model
             if PROPERTIES['save_models'] and trained_models and 'ExtraTrees' in trained_models:
@@ -135,13 +160,34 @@ def loadPreprocessTrainMergedDataset(merged_df):
     X = merged_df.drop(columns=["suicide"])
     y = merged_df["suicide"]
 
-    # show basic info about merged_df
+    # Get merged dataset statistics
+    merged_stats = {
+        'Pre-Rows': merged_df.shape[0],
+        'Pre-Columns': merged_df.shape[1] + 1,  # Add 1 for the suicide column we dropped
+        'Pre-Total Elements': merged_df.count().sum() + len(merged_df),  # Add suicide column count
+        'Pre-Missing Cells': 0,  # Already imputed in individual datasets
+        'Post-Rows': merged_df.shape[0],
+        'Post-Columns': merged_df.shape[1] + 1,
+        'Post-Total Elements': merged_df.count().sum() + len(merged_df),
+        'Post-Missing Cells': 0,
+        'Class_0_Samples': int(y[y == 0].count()),
+        'Class_1_Samples': int(y[y == 1].count())
+    }
+
+    # Show basic info about merged_df
     print(f"\n📊 Dataset States ")
     print(f"Rows: {merged_df.shape[0]}")
-    print(f"Columns: {merged_df.shape[1]}")
-    print(f"Total Elements: {merged_df.count().sum()}")
+    print(f"Columns: {merged_df.shape[1] + 1}")
+    print(f"Total Elements: {merged_df.count().sum() + len(merged_df)}")
 
-    trained_models = smote_train(X, y)
+    trained_models, model_scores = smote_train(X, y, return_metrics=True)
+
+    # Store merged dataset results if results saving is enabled
+    if PROPERTIES['save_results']:
+        result_row = {"Dataset_Name": "merged_dataset"}
+        result_row.update(merged_stats)
+        result_row.update(model_scores)
+        summary_results.append(result_row)
 
     # Save Extra Trees model
     if PROPERTIES['save_models'] and trained_models and 'ExtraTrees' in trained_models:
@@ -168,6 +214,15 @@ def loadPreprocessTrainMergedDataset(merged_df):
 def main():
     initialize_properties()
     loadPreprocessTrain()
+    
+    # Save results to CSV if enabled
+    if PROPERTIES['save_results'] and summary_results:
+        try:
+            results_df = pd.DataFrame(summary_results)
+            results_df.to_csv(OUTPUT_CSV, index=False)
+            print(f"\n💾 Results saved to: {OUTPUT_CSV}")
+        except Exception as e:
+            print(f"❌ Error saving results to CSV: {e}")
 
 
 if __name__ == '__main__':
