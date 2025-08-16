@@ -129,6 +129,9 @@ def smote_train(X, y, return_metrics=False):
 
 def evaluate_models(models, X_test, y_test):
     """Evaluate trained models and print results."""
+    # Store ROC data for combined plot
+    roc_data = {}
+    
     for name, model in models.items():
         X_input = X_test.values if name == "TabNet" else X_test
         y_pred = model.predict(X_input)
@@ -138,15 +141,28 @@ def evaluate_models(models, X_test, y_test):
         print(f"{name} Confusion Matrix:\n{confusion_matrix(y_test, y_pred)}")
         print(f"{name} Classification Report:\n{classification_report(y_test, y_pred)}")
 
+        # Store ROC data for combined plot
+        if y_proba is not None:
+            fpr, tpr, _ = roc_curve(y_test, y_proba)
+            roc_auc = auc(fpr, tpr)
+            roc_data[name] = {'fpr': fpr, 'tpr': tpr, 'auc': roc_auc}
+
         try:
             from main import PROPERTIES
             if PROPERTIES.get("save_graphs", False):
                 print(f"Saving graphs")
                 save_confusion_matrix(y_test, y_pred, name, f"{name.lower()}_confusion_matrix.png")
-                if y_proba is not None:
-                    save_roc_curve(y_test, y_proba, name, f"{name.lower()}_roc_curve.png")
         except ImportError:
             print("Note: 'main.PROPERTIES' not found. Skipping graph saving.")
+    
+    # Save combined ROC curve after evaluating all models
+    try:
+        from main import PROPERTIES
+        if PROPERTIES.get("save_graphs", False) and roc_data:
+            print("Saving combined ROC curve")
+            save_combined_roc_curve(roc_data, "combined_roc_curve.png")
+    except ImportError:
+        print("Note: 'main.PROPERTIES' not found. Skipping combined ROC curve saving.")
 
 
 def save_confusion_matrix(y_true, y_pred, model_name, filename):
@@ -162,18 +178,27 @@ def save_confusion_matrix(y_true, y_pred, model_name, filename):
     plt.close()
 
 
-def save_roc_curve(y_true, y_proba, model_name, filename):
-    """Save a ROC curve plot."""
-    fpr, tpr, _ = roc_curve(y_true, y_proba)
-    roc_auc = auc(fpr, tpr)
-
-    plt.figure(figsize=(7, 6))
-    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'AUC = {roc_auc:.2f}')
-    plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
-    plt.title(f'{model_name} ROC Curve')
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.legend(loc='lower right')
+def save_combined_roc_curve(roc_data, filename):
+    """Save a combined ROC curve plot for all models."""
+    plt.figure(figsize=(10, 8))
+    
+    # Define colors for different models
+    colors = ['darkorange', 'red', 'green', 'blue', 'purple', 'brown', 'pink']
+    
+    for i, (model_name, data) in enumerate(roc_data.items()):
+        color = colors[i % len(colors)]
+        plt.plot(data['fpr'], data['tpr'], color=color, lw=2, 
+                label=f'{model_name} (AUC = {data["auc"]:.3f})')
+    
+    # Plot diagonal line (random classifier)
+    plt.plot([0, 1], [0, 1], color='navy', linestyle='--', lw=2, label='Random Classifier (AUC = 0.5)')
+    
+    plt.title('Combined ROC Curves for All Models', fontsize=16)
+    plt.xlabel('False Positive Rate', fontsize=14)
+    plt.ylabel('True Positive Rate', fontsize=14)
+    plt.legend(loc='lower right', fontsize=12)
+    plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(filename)
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.close()
+    print(f"Combined ROC curve saved as '{filename}'")
