@@ -119,9 +119,7 @@ def load_and_preprocess_data(filepath):
     # Create suicide target variable
     def create_suicide_target(row):
         """
-        Returns:
-            1 → if student considered suicide, made a plan, or attempted
-            0 → otherwise
+
         """
         if row["q24"] == 1:  # Considered suicide
             return 1
