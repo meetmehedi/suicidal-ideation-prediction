@@ -1,0 +1,23 @@
+================================================================================
+UNIFIED GSHS DATASET SUMMARY
+================================================================================
+
+Total Records: 39885
+Total Countries: 11
+Total Questions: 27
+
+Countries Included:
+  - Bangladesh 2014: 2989 records
+  - Brunei 2019: 2400 records
+  - Mauritius (Rodrigues) 2019: 2715 records
+  - Nepal 2015: 6529 records
+  - Panama 2018: 2948 records
+  - Philippines 2019: 3520 records
+  - Saint Lucia 2018: 1970 records
+  - Thailand 2015: 5894 records
+  - Thailand 2021: 5661 records
+  - Timor-Leste 2015: 3704 records
+  - Uruguay 2019: 1555 records
+
+Dataset Info:
+None
