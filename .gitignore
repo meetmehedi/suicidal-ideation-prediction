@@ -3,5 +3,5 @@
 *.pyc
 *.jpg
 *.png
-
+*.pdf
 *.pkl
