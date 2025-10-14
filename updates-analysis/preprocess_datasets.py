@@ -53,9 +53,9 @@ def preprocess_dataset(input_csv_path, output_csv_path, question_mapping, countr
     print(f"\nProcessing {country_name}...")
     
     # Read the CSV file
-    df = pd.read_csv(input_csv_path)
+    df = pd.read_csv(input_csv_path, low_memory=False)
     print(f"  Original shape: {df.shape}")
-    print(f"  Original columns: {df.columns.tolist()[:20]}...")  # Show first 20 columns
+    print(f"  Original columns (first 20): {df.columns.tolist()[:20]}")
     
     # Create a case-insensitive column mapping for the dataframe
     col_mapping_lower = {col.lower(): col for col in df.columns}
@@ -67,24 +67,41 @@ def preprocess_dataset(input_csv_path, output_csv_path, question_mapping, countr
     found_mappings = []
     missing_mappings = []
     
+    # Clean the question_mapping to remove lowercase duplicates
+    # (we added them for matching, but we only want to iterate once per question)
+    seen_ref_questions = set()
+    
     for country_q, ref_q in question_mapping.items():
-        # Try both original case and lowercase
+        # Skip if we've already processed this reference question
+        if ref_q in seen_ref_questions:
+            continue
+            
+        # Try to find the column in the dataframe (case-insensitive)
         country_q_lower = country_q.lower()
         
         if country_q in df.columns:
+            # Exact match
             mapped_df[ref_q] = df[country_q]
             found_mappings.append(f"{country_q} -> {ref_q}")
+            seen_ref_questions.add(ref_q)
         elif country_q_lower in col_mapping_lower:
+            # Case-insensitive match
             actual_col = col_mapping_lower[country_q_lower]
             mapped_df[ref_q] = df[actual_col]
             found_mappings.append(f"{actual_col} -> {ref_q}")
+            seen_ref_questions.add(ref_q)
         else:
-            missing_mappings.append(f"{country_q} (for {ref_q})")
+            # Column not found
+            if country_q not in missing_mappings and country_q_lower not in [m.lower() for m in missing_mappings]:
+                missing_mappings.append(f"{country_q} (for {ref_q})")
     
     print(f"  Mapped {len(found_mappings)} questions")
-    if missing_mappings:
+    if missing_mappings and len(missing_mappings) > 0:
         print(f"  Warning: {len(missing_mappings)} expected columns not found in dataset")
-        print(f"    Missing: {', '.join([m.split(' (')[0] for m in missing_mappings[:5]])}...")
+        if len(missing_mappings) <= 10:
+            print(f"    Missing: {', '.join([m.split(' (')[0] for m in missing_mappings])}")
+        else:
+            print(f"    Missing: {', '.join([m.split(' (')[0] for m in missing_mappings[:10]])}... (and {len(missing_mappings)-10} more)")
     
     # Save the preprocessed data
     mapped_df.to_csv(output_csv_path, index=False)
@@ -108,12 +125,15 @@ def parse_mapping_excel(mapping_df):
     print("\nParsing mapping structure...")
     print(f"Available columns: {mapping_df.columns.tolist()}")
     
-    # Get reference questions (assuming first column or named 'RefQuestion')
-    ref_col = mapping_df.columns[0]  # Adjust if needed
+    # Get reference questions (first column contains reference questions like q1, q2, etc.)
+    ref_col = mapping_df.columns[0]  # 'Ref' column
     
-    # Iterate through other columns to create country mappings
-    for col in mapping_df.columns[1:]:
-        country_name = col.replace('_Q', '').replace('_', ' ')
+    # Skip the second column if it's a description (like 'Question Concept')
+    start_col_idx = 2 if len(mapping_df.columns) > 2 else 1
+    
+    # Iterate through country columns to create mappings
+    for col in mapping_df.columns[start_col_idx:]:
+        country_name = col.strip()
         country_mappings[country_name] = {}
         
         for idx, row in mapping_df.iterrows():
@@ -121,8 +141,15 @@ def parse_mapping_excel(mapping_df):
             country_question = row[col]
             
             # Skip if mapping is empty or NaN
-            if pd.notna(country_question) and str(country_question).strip():
-                country_mappings[country_name][str(country_question).strip()] = str(ref_question).strip()
+            if pd.notna(ref_question) and pd.notna(country_question):
+                ref_q_str = str(ref_question).strip()
+                country_q_str = str(country_question).strip()
+                
+                if ref_q_str and country_q_str:
+                    # Store both the original and lowercase version for case-insensitive matching
+                    country_mappings[country_name][country_q_str] = ref_q_str
+                    # Also add lowercase version as key
+                    country_mappings[country_name][country_q_str.lower()] = ref_q_str
     
     return country_mappings
 
@@ -131,22 +158,21 @@ def map_csv_filename_to_country(csv_filename):
     Map CSV filename to country name in the mapping Excel.
     Returns: country name string
     """
-    # Extract country name from filename
-    # e.g., "MUS_Rodrigues_2019_GSHS.csv" -> "Rodrigues"
-    # or "Bangladesh_22014.csv" -> "Bangladesh"
+    # Extract country name from filename to match Excel column names
+    # The Excel has columns like: 'Mauritius, 2019', 'Thailand 2021', etc.
     
     name_mappings = {
-        'Bangladesh_22014.csv': 'Bangladesh',
-        'Brunei_Darussalam_2019.csv': 'Brunei',
-        'MUS_Rodrigues_2019_GSHS.csv': 'Rodrigues',
-        'Nepal_2015.csv': 'Nepal',
-        'Panama_2018.csv': 'Panama',
-        'Philippines_2019.csv': 'Philippines',
-        'Saint_Lucia_2018.csv': 'Saint Lucia',
-        'Thailand_2015.csv': 'Thailand 2015',
+        'Bangladesh_22014.csv': 'Bangladesh 2014',
+        'Brunei_Darussalam_2019.csv': 'Brunei Darussalam 2019',
+        'MUS_Rodrigues_2019_GSHS.csv': 'Mauritius, 2019',
+        'Nepal_2015.csv': 'Nepal 2015',
+        'Panama_2018.csv': 'Panama 2018',
+        'Philippines_2019.csv': 'Philippines 2019',
+        'Saint_Lucia_2018.csv': 'Saint Lucia 2018',
+        'Thailand_2015.csv': 'Thailand 2014',
         'Thailand-2021.csv': 'Thailand 2021',
-        'Timor_leste_2015.csv': 'Timor-Leste',  # Match Excel column name
-        'Uruguay-2019.csv': 'Uruguay',
+        'Timor_leste_2015.csv': 'Timor-Leste 2014',
+        'Uruguay-2019.csv': 'Uruguay 2019',
         'GHSH_Pooled_Data1.csv': 'Pooled'
     }
     
@@ -201,14 +227,29 @@ def main():
         country_name = map_csv_filename_to_country(csv_file.name)
         output_file = output_dir / f"converted_{csv_file.name}"
         
-        # Find matching mapping
+        # Find exact matching mapping first, then try partial match
         mapping = None
+        matched_country = None
+        
+        # First try exact match (case-insensitive)
         for map_country, map_dict in country_mappings.items():
-            if map_country.lower() in country_name.lower() or country_name.lower() in map_country.lower():
+            if map_country.lower() == country_name.lower():
                 mapping = map_dict
+                matched_country = map_country
                 break
         
+        # If no exact match, try partial match
+        if not mapping:
+            for map_country, map_dict in country_mappings.items():
+                if (map_country.lower() in country_name.lower() or 
+                    country_name.lower() in map_country.lower()):
+                    mapping = map_dict
+                    matched_country = map_country
+                    break
+        
         if mapping and len(mapping) > 0:
+            print(f"\n{'='*60}")
+            print(f"Matched '{csv_file.name}' to mapping column '{matched_country}'")
             try:
                 result_df = preprocess_dataset(csv_file, output_file, mapping, country_name)
                 results[country_name] = {
@@ -218,9 +259,12 @@ def main():
                 }
             except Exception as e:
                 print(f"  Error processing {country_name}: {e}")
+                import traceback
+                traceback.print_exc()
                 results[country_name] = {'status': 'error', 'message': str(e)}
         else:
-            print(f"\nSkipping {country_name}: No mapping found in Excel file")
+            print(f"\nSkipping {csv_file.name}: No mapping found for '{country_name}'")
+            print(f"  Available mappings: {', '.join(country_mappings.keys())}")
             results[country_name] = {'status': 'skipped', 'message': 'No mapping found'}
     
     # Print summary
