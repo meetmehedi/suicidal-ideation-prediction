@@ -1,7 +1,31 @@
-*.csv
+# Dataset folders
+ml_codes/datasets_asia/
+ml_codes/datasets/
+ml_codes/*.csv
+ 
+
+# Dataset folders - ignore all CSV files in these directories
+ml_codes/datasets_asia/*.csv
+ml_codes/datasets/*.csv
+
+updates-analysis/questions/*.pdf
+
+# Compressed files
 *.zip
+
+# Python cache
 *.pyc
+__pycache__/
+
+# Images
 *.jpg
 *.png
-*.pdf
+
+# Model files
 *.pkl
+
+# CSV data files (optional - uncomment if you want to ignore all CSVs)
+# *.csv
+
+# Excel files with data (optional)
+# *.xlsx

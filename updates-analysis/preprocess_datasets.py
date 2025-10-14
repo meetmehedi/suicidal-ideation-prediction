@@ -167,14 +167,11 @@ def map_csv_filename_to_country(csv_filename):
         'MUS_Rodrigues_2019_GSHS.csv': 'Mauritius, 2019',
         'Nepal_2015.csv': 'Nepal 2015',
         'Panama_2018.csv': 'Panama 2018',
-        'Philippines_2019.csv': 'Philippines 2019',
         'Saint_Lucia_2018.csv': 'Saint Lucia 2018',
         'Thailand_2015.csv': 'Thailand 2014',
         'Thailand-2021.csv': 'Thailand 2021',
         'Timor_leste_2015.csv': 'Timor-Leste 2014',
-        'Uruguay-2019.csv': 'Uruguay 2019',
-        'GHSH_Pooled_Data1.csv': 'Pooled'
-    }
+     }
     
     return name_mappings.get(csv_filename, csv_filename.replace('.csv', ''))
 
