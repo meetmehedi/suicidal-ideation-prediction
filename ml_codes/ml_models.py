@@ -1,5 +1,6 @@
 # smote_training.py
 
+import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -30,7 +31,7 @@ def print_class_distribution(y, label=""):
     print(pd.Series(y).value_counts())
 
 
-def smote_train(X, y, return_metrics=False):
+def smote_train(X, y, PROPERTIES: dict, return_metrics=False):
     """
     Train multiple models using SMOTE oversampling to balance the dataset.
     
@@ -115,7 +116,7 @@ def smote_train(X, y, return_metrics=False):
             importances = pd.Series(model.feature_importances_, index=X_train.columns).sort_values(ascending=False)
             print(importances)
     print("\nModel training completed.")
-    evaluate_models(models, X_test, y_test)
+    evaluate_models(models, PROPERTIES, X_test, y_test)
 
     # Add model metrics to metrics_dict (which already has class distribution)
     for name, scores in model_scores.items():
@@ -127,7 +128,7 @@ def smote_train(X, y, return_metrics=False):
     return (models, metrics_dict) if return_metrics else (models, metrics_dict)
 
 
-def evaluate_models(models, X_test, y_test):
+def evaluate_models(models, PROPERTIES: dict, X_test, y_test):
     """Evaluate trained models and print results."""
     # Store ROC data for combined plot
     roc_data = {}
@@ -148,19 +149,27 @@ def evaluate_models(models, X_test, y_test):
             roc_data[name] = {'fpr': fpr, 'tpr': tpr, 'auc': roc_auc}
 
         try:
-            from main import PROPERTIES
             if PROPERTIES.get("save_graphs", False):
-                print(f"Saving graphs")
-                save_confusion_matrix(y_test, y_pred, name, f"{name.lower()}_confusion_matrix.png")
+                dataset_name = PROPERTIES.get("current_dataset_name", "unknown")
+                graphs_dir = PROPERTIES.get("graphs_dir", "model_graphs")
+                # Create dataset-specific directory
+                dataset_graphs_dir = os.path.join(graphs_dir, dataset_name)
+                os.makedirs(dataset_graphs_dir, exist_ok=True)
+                print(f"Saving graphs for {dataset_name}")
+                save_confusion_matrix(y_test, y_pred, name, os.path.join(dataset_graphs_dir, f"{name.lower()}_cm.png"))
         except ImportError:
             print("Note: 'main.PROPERTIES' not found. Skipping graph saving.")
     
     # Save combined ROC curve after evaluating all models
     try:
-        from main import PROPERTIES
         if PROPERTIES.get("save_graphs", False) and roc_data:
-            print("Saving combined ROC curve")
-            save_combined_roc_curve(roc_data, "combined_roc_curve.png")
+            dataset_name = PROPERTIES.get("current_dataset_name", "unknown")
+            graphs_dir = PROPERTIES.get("graphs_dir", "model_graphs")
+            # Create dataset-specific directory
+            dataset_graphs_dir = os.path.join(graphs_dir, dataset_name)
+            os.makedirs(dataset_graphs_dir, exist_ok=True)
+            print(f"Saving combined ROC curve for {dataset_name}")
+            save_combined_roc_curve(roc_data, os.path.join(dataset_graphs_dir, "combined_roc_curve.png"))
     except ImportError:
         print("Note: 'main.PROPERTIES' not found. Skipping combined ROC curve saving.")
 

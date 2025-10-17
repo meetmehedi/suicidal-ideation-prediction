@@ -22,7 +22,7 @@ summary_results = []
 PROPERTIES = {
     'merge_datasets': False,
     'save_graphs': False,
-    'save_models': True,
+    'save_models': False,
     'save_results': False,
     'model_dir': 'trained_models',
     'graphs_dir': 'model_graphs',
@@ -76,8 +76,8 @@ def initialize_properties():
             print("💾 Merged dataset will be saved as 'merged_dataset.csv'.\n")
 
     PROPERTIES['save_graphs'] = ask_yes_no("Save confusion matrix & ROC curve?", default="no")
-    PROPERTIES['save_models'] = ask_yes_no("Save model as .pkl file?", default="yes")
-    PROPERTIES['save_results'] = ask_yes_no("Save results to CSV file?", default="yes")
+    PROPERTIES['save_models'] = ask_yes_no("Save model as .pkl file?", default="no")
+    PROPERTIES['save_results'] = ask_yes_no("Save results to CSV file?", default="no")
     if PROPERTIES['save_results']:
         print("💾 Results will be saved in 'summary_results_[datetime].csv'.\n")
 
@@ -120,7 +120,9 @@ def loadPreprocessTrain():
 
             # Train models
             print("\n" + "="*20 + f" Training Models for : {dataset_name} " + "="*20)
-            trained_models, model_scores = smote_train(X, y, return_metrics=True)
+            # Set current dataset name for graph saving
+            PROPERTIES['current_dataset_name'] = dataset_name
+            trained_models, model_scores = smote_train(X, y, PROPERTIES ,return_metrics=True)
 
             # Store results
             if PROPERTIES['save_results']:
@@ -153,6 +155,9 @@ def loadPreprocessTrainMergedDataset(merged_df):
     Optionally save dataset and model.
     """
     print("\n" + "="*20 + " Working on Merged Dataset " + "="*20)
+
+    # Set current dataset name for graph saving
+    PROPERTIES['current_dataset_name'] = "merged_dataset"
 
     # Shuffle merged dataset
     merged_df = merged_df.sample(frac=1, random_state=42).reset_index(drop=True)
