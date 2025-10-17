@@ -21,7 +21,7 @@ summary_results = []
 # Default properties (can be modified by user input)
 PROPERTIES = {
     'merge_datasets': False,
-    'save_graphs': True,
+    'save_graphs': False,
     'save_models': True,
     'save_results': False,
     'model_dir': 'trained_models',
@@ -75,7 +75,7 @@ def initialize_properties():
         if PROPERTIES['save_merged_dataset']:
             print("💾 Merged dataset will be saved as 'merged_dataset.csv'.\n")
 
-    PROPERTIES['save_graphs'] = ask_yes_no("Save confusion matrix & ROC curve?", default="yes")
+    PROPERTIES['save_graphs'] = ask_yes_no("Save confusion matrix & ROC curve?", default="no")
     PROPERTIES['save_models'] = ask_yes_no("Save model as .pkl file?", default="yes")
     PROPERTIES['save_results'] = ask_yes_no("Save results to CSV file?", default="yes")
     if PROPERTIES['save_results']:
