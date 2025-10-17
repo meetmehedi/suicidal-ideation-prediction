@@ -185,7 +185,7 @@ def loadPreprocessTrainMergedDataset(merged_df):
     print(f"Columns: {merged_df.shape[1] + 1}")
     print(f"Total Elements: {merged_df.count().sum() + len(merged_df)}")
 
-    trained_models, model_scores = smote_train(X, y, return_metrics=True)
+    trained_models, model_scores = smote_train(X, y, PROPERTIES, return_metrics=True)
 
     # Store merged dataset results if results saving is enabled
     if PROPERTIES['save_results']:
