@@ -5,7 +5,6 @@ from sklearn.impute import KNNImputer
 # =====================================================
 # Targeted Columns Mapping
 # =====================================================
-# Maps question IDs to human-readable names (for developer reference)
 targeted_fields = {
     "q1": "Custom Age",
     "q2": "Sex",
@@ -36,6 +35,9 @@ targeted_fields = {
     "q58": "Parents go through their things",
 }
 
+# Suicide-indicator columns (used for label creation, then dropped)
+SUICIDE_COLS = ["q24", "q25", "q26"]
+
 
 # =====================================================
 # Helper: Print Dataset State
@@ -54,93 +56,102 @@ def print_dataset_states(df, title="Dataset States"):
 # =====================================================
 def load_and_preprocess_data(filepath):
     """
-    Loads and preprocesses a dataset.
-    Steps:
-      1. Reads CSV file
-      2. Filters only targeted columns
-      3. Imputes missing values (KNN)
-      4. Creates 'suicide' target variable
+    Loads and preprocesses a dataset — reviewer-compliant version.
+
+    Pipeline (leakage-free):
+      1. Read CSV
+      2. Filter to targeted columns
+      3. Build 'suicide' label from RAW q24/q25/q26 (before imputation)
+      4. Drop q24/q25/q26 from feature set
+      5. KNN-impute (k=5) ONLY on feature columns
+      6. Re-attach label
+
     Returns:
-      Tuple of (preprocessed DataFrame, stats_dict) or (None, None) if preprocessing is not possible
-      where stats_dict contains pre and post processing statistics
+      (DataFrame, stats_dict) or (None, None) on failure
     """
     print(f"\n📂 Loading dataset: {filepath}")
     df = pd.read_csv(filepath)
 
-    # Convert column names to lowercase to avoid case mismatches
+    # Normalise column names
     df.columns = df.columns.str.lower()
 
     # Identify available & missing targeted columns
     available_cols = [col for col in targeted_fields if col in df.columns]
-    missing_cols = [col for col in targeted_fields if col not in df.columns]
+    missing_cols   = [col for col in targeted_fields if col not in df.columns]
 
     if missing_cols:
-        print(f"⚠️ Missing targeted columns: {missing_cols}")
+        print(f"⚠️  Missing targeted columns: {missing_cols}")
     print(f"✅ Found {len(available_cols)}/{len(targeted_fields)} targeted columns.")
 
-    # Keep only available targeted columns
     df = df[available_cols]
 
-    # If no targeted columns found → skip dataset
     if df.empty:
         print("❌ No targeted columns found. Skipping this dataset.")
-        return None
+        return None, None
 
-    # Before imputation statistics
-    print_dataset_states(df, "Before Imputation")
-    stats = {
-        'Pre-Rows': len(df),
-        'Pre-Columns': len(df.columns),
-        'Pre-Total Elements': df.count().sum(),
-        'Pre-Missing Cells': df.isnull().sum().sum(),
-    }
+    # ── Step 1: Check suicide columns exist ──────────────────────────────────
+    available_suicide_cols = [c for c in SUICIDE_COLS if c in df.columns]
+    if len(available_suicide_cols) < 3:
+        print(f"⚠️  Missing suicide columns. Found: {available_suicide_cols}. Skipping.")
+        return None, None
 
-    # Impute missing values using KNN
-    try:
-        imputer = KNNImputer(n_neighbors=len(df) - 1)  # Avoid too large k
-        df = pd.DataFrame(imputer.fit_transform(df), columns=df.columns)
-    except Exception as e:
-        print(f"❌ Error during KNN imputation: {e}")
-        return None
+    print(f"✅ All suicide-related columns found: {available_suicide_cols}")
 
-    print_dataset_states(df, "After KNN Imputation")
-
-    # Suicide-related columns
-    suicide_cols = ["q24", "q25", "q26"]
-    available_suicide_cols = [col for col in suicide_cols if col in df.columns]
-
-    if len(available_suicide_cols) == 3:
-        print(f"✅ All suicide-related columns found: {available_suicide_cols}")
-    else:
-        print(f"⚠️ Missing suicide-related columns. Found: {available_suicide_cols}")
-        print("   Skipping this dataset.")
-        return None
-
-    # Create suicide target variable
+    # ── Step 2: Build label from RAW values (no imputation yet) ──────────────
     def create_suicide_target(row):
         """
-
+        Positive (1) if the student:
+          - considered suicide  (q24 == 1), OR
+          - made a plan         (q25 == 1), OR
+          - attempted ≥1 time   (q26 >  1; value 1 means "0 attempts")
         """
-        if row["q24"] == 1:  # Considered suicide
+        if row["q24"] == 1:
             return 1
-        if row["q25"] == 1:  # Made a suicide plan
+        if row["q25"] == 1:
             return 1
-        if row["q26"] > 1:   # Attempted suicide (1 = no attempt, >1 = attempts)
+        if row["q26"] > 1:
             return 1
         return 0
 
-    df["suicide"] = df.apply(create_suicide_target, axis=1)
+    suicide_target = df.apply(create_suicide_target, axis=1)
 
-    # Remove original suicide-related columns to avoid leakage
-    df.drop(columns=available_suicide_cols, inplace=True)
+    # ── Step 3: Drop outcome columns BEFORE imputation ───────────────────────
+    feature_df = df.drop(columns=available_suicide_cols)
 
-    print("🆕 'suicide' target column created successfully.")
-    print_dataset_states(df, "Final Processed Dataset")
+    # Pre-imputation statistics
+    print_dataset_states(feature_df, "Before Imputation (features only)")
+    stats = {
+        "Pre-Rows":           len(feature_df),
+        "Pre-Columns":        feature_df.shape[1] + len(available_suicide_cols),
+        "Pre-Total Elements": int(feature_df.count().sum()),
+        "Pre-Missing Cells":  int(feature_df.isnull().sum().sum()),
+    }
 
-    # Collect statistics
-    stats["Post-Rows"] = df.shape[0]
-    stats["Post-Columns"] = df.shape[1]
-    stats["Post-Total Elements"] = df.count().sum()
-    stats["Post-Missing Cells"] = df.isnull().sum().sum()
+    # ── Step 4: KNN impute features ONLY (k=5, reviewer-recommended) ─────────
+    try:
+        imputer   = KNNImputer(n_neighbors=5)
+        feature_df = pd.DataFrame(
+            imputer.fit_transform(feature_df),
+            columns=feature_df.columns,
+        )
+    except Exception as e:
+        print(f"❌ KNN imputation failed: {e}")
+        return None, None
 
-    return df, stats
+    print_dataset_states(feature_df, "After KNN Imputation (features only)")
+
+    # ── Step 5: Re-attach label ───────────────────────────────────────────────
+    feature_df["suicide"] = suicide_target.values
+
+    print("🆕 'suicide' target column created and attached.")
+    print_dataset_states(feature_df, "Final Processed Dataset")
+
+    # Post stats
+    stats["Post-Rows"]           = feature_df.shape[0]
+    stats["Post-Columns"]        = feature_df.shape[1]
+    stats["Post-Total Elements"] = int(feature_df.count().sum())
+    stats["Post-Missing Cells"]  = int(feature_df.isnull().sum().sum())
+
+    return feature_df, stats
+
+

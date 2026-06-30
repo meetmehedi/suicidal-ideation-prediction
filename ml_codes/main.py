@@ -36,50 +36,17 @@ PROPERTIES = {
 # =====================================================
 def initialize_properties():
     """
-    Ask user for training settings.
-    This lets them control whether to merge datasets, save models, graphs, etc.
+    Non-interactive configuration.
+    All options default to True so the script runs without user prompts.
     """
-    print("\n=== ML Training Configuration ===")
-    print("Press Enter to use the default option shown in brackets.\n")
-
-    def ask_yes_no(prompt, default="no"):
-        """Ask a yes/no question, return True for yes, False for no."""
-        valid = ['yes', 'no', 'y', 'n', '']
-
-        # Convert default string to boolean properly
-        if default.lower() in ['yes', 'y']:
-            default_bool = True
-        elif default.lower() in ['no', 'n']:
-            default_bool = False
-        else:
-            default_bool = False  # fallback
-
-        while True:
-            answer = input(f"{prompt} (yes/no) [{default}]: ").strip().lower()
-            if answer in valid:
-                if answer == '':
-                    return default_bool
-                return answer in ['yes', 'y']
-            print("⚠️ Please enter 'yes', 'y', 'no', 'n', or press Enter for default.")
-
-    # Initialize PROPERTIES dictionary if not exists
     global PROPERTIES
-    if 'PROPERTIES' not in globals():
-        PROPERTIES = {}
-
-    # Questions
-    PROPERTIES['merge_datasets'] = ask_yes_no("Merge datasets?", default="no")
-    if PROPERTIES['merge_datasets']:
-        print("💡 Merging datasets will increase training time and memory usage.\n")
-        PROPERTIES['save_merged_dataset'] = ask_yes_no("Save merged dataset as CSV?", default="no")
-        if PROPERTIES['save_merged_dataset']:
-            print("💾 Merged dataset will be saved as 'merged_dataset.csv'.\n")
-
-    PROPERTIES['save_graphs'] = ask_yes_no("Save confusion matrix & ROC curve?", default="no")
-    PROPERTIES['save_models'] = ask_yes_no("Save model as .pkl file?", default="no")
-    PROPERTIES['save_results'] = ask_yes_no("Save results to CSV file?", default="no")
-    if PROPERTIES['save_results']:
-        print("💾 Results will be saved in 'summary_results_[datetime].csv'.\n")
+    print("\n=== ML Training Configuration (non-interactive mode) ===")
+    PROPERTIES['merge_datasets']      = True
+    PROPERTIES['save_merged_dataset'] = False
+    PROPERTIES['save_graphs']         = True
+    PROPERTIES['save_models']         = True
+    PROPERTIES['save_results']        = True
+    print("Settings: merge=True | graphs=True | models=True | results=True")
 
 
 
@@ -131,15 +98,16 @@ def loadPreprocessTrain():
                 result_row.update(model_scores)
                 summary_results.append(result_row)
 
-            # Save only Extra Trees model
+            # Save Extra Trees model as both .joblib and .pkl
             if PROPERTIES['save_models'] and trained_models and 'ExtraTrees' in trained_models:
                 os.makedirs(PROPERTIES['model_dir'], exist_ok=True)
-                model_filename = os.path.join(PROPERTIES['model_dir'], f"{dataset_name}_extra_trees.pkl")
-                try:
-                    joblib.dump(trained_models['ExtraTrees'], model_filename)
-                    print(f"✅ Saved Extra Trees model: {model_filename}")
-                except Exception as e:
-                    print(f"❌ Error saving model: {e}")
+                for ext in ["joblib", "pkl"]:
+                    path = os.path.join(PROPERTIES['model_dir'], f"{dataset_name}_extra_trees.{ext}")
+                    try:
+                        joblib.dump(trained_models['ExtraTrees'], path)
+                        print(f"✅ Saved Extra Trees model to {path}")
+                    except Exception as e:
+                        print(f"❌ Error saving model ({ext}): {e}")
 
     # If merging enabled, train on merged dataset
     if PROPERTIES['merge_datasets'] and merged_df is not None:
@@ -194,15 +162,16 @@ def loadPreprocessTrainMergedDataset(merged_df):
         result_row.update(model_scores)
         summary_results.append(result_row)
 
-    # Save Extra Trees model
+    # Save merged Extra Trees model as both .joblib and .pkl
     if PROPERTIES['save_models'] and trained_models and 'ExtraTrees' in trained_models:
         os.makedirs(PROPERTIES['model_dir'], exist_ok=True)
-        model_filename = os.path.join(PROPERTIES['model_dir'], "merged_extra_trees.pkl")
-        try:
-            joblib.dump(trained_models['ExtraTrees'], model_filename)
-            print(f"✅ Saved merged Extra Trees model: {model_filename}")
-        except Exception as e:
-            print(f"❌ Error saving model: {e}")
+        for ext in ["joblib", "pkl"]:
+            path = os.path.join(PROPERTIES['model_dir'], f"merged_extra_trees.{ext}")
+            try:
+                joblib.dump(trained_models['ExtraTrees'], path)
+                print(f"✅ Saved merged Extra Trees model to {path}")
+            except Exception as e:
+                print(f"❌ Error saving model ({ext}): {e}")
 
     # Save merged dataset
     if PROPERTIES['save_merged_dataset']:

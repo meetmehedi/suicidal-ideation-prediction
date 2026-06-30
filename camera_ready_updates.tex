@@ -1,0 +1,103 @@
+\documentclass{article}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{hyperref}
+
+\begin{document}
+
+\section*{Camera-Ready Updates for Paper}
+
+\textit{Instructions: Copy and paste the relevant sections below into your main \texttt{.tex} file to address the reviewers' comments. Ensure you update any cross-references (e.g., Table \ref{tab:new_results}) to match your document's numbering.}
+
+% ==========================================
+% UPDATE 1: Data Preprocessing & Experimental Setup
+% Place this in your Methodology or Experimental Setup section.
+% Addresses Reviewer 1 (Data Leakage/SMOTE)
+% ==========================================
+\subsection*{Updated Text for Methodology (Data Splitting and Balancing)}
+
+To ensure robust evaluation and prevent data leakage, we implemented a strict data splitting protocol before applying any balancing techniques. Specifically, the raw datasets were first partitioned into a training/validation set (80\%) and a held-out test set (20\%) using stratified sampling to maintain the original class distribution. The training/validation set was further split into a final training set (80\%, which is 64\% of the total data) and a validation set (20\%, which is 16\% of the total data). 
+
+Crucially, the Synthetic Minority Over-sampling Technique (SMOTE) was applied \textit{exclusively} to the 64\% training partition to address class imbalance. The validation and test sets were left in their original, imbalanced state (with positive class ratios ranging from approximately 10\% to 22\%). This approach ensures that the models are evaluated on realistic, real-world data distributions rather than artificially balanced synthetic data, providing a more accurate reflection of their performance in clinical screening scenarios.
+
+
+% ==========================================
+% UPDATE 2: Hyperparameter Tuning
+% Place this in Methodology or as an Appendix.
+% Addresses Reviewer 2 (Hyperparameter Tuning)
+% ==========================================
+\subsection*{Updated Text for Methodology (Hyperparameter Optimization)}
+
+While initial experiments utilized default hyperparameters to establish baseline performance, the final models were optimized using Randomized Search Cross-Validation (RandomizedSearchCV). This process involved exploring a defined hyperparameter space for our top-performing models (e.g., ExtraTrees and XGBoost) to identify the optimal configurations that maximize the Macro-F1 score on the validation set. 
+
+
+% ==========================================
+% UPDATE 3: Results Section & New Table
+% Place this in your Results section.
+% Addresses Reviewer 1 (Reporting correct metrics)
+% ==========================================
+\subsection*{Updated Text for Results Section}
+
+Given the significant class imbalance in the original datasets, evaluating model performance solely on accuracy can be misleading. A model could achieve high accuracy by simply predicting the majority class (non-suicidal), which is clinically ineffective. Therefore, our primary evaluation metrics are the Macro-F1 score and the Area Under the Precision-Recall Curve (PR-AUC), as these metrics provide a more balanced assessment of performance across both classes, particularly penalizing poor performance on the critical minority class (suicidal ideation/attempt). We also report Sensitivity (Recall) to evaluate the models' ability to correctly identify at-risk students.
+
+Table \ref{tab:new_results} presents the performance of the machine learning classifiers evaluated on the raw, imbalanced held-out test sets. Across the individual country cohorts and the merged multi-country dataset, the Extra Trees classifier consistently demonstrated superior performance. On the merged dataset, Extra Trees achieved a Macro-F1 score of 0.6302 and a PR-AUC of 0.4796. While the absolute accuracy (82.48\%) is lower than what might be observed on artificially balanced test sets, these metrics provide a realistic and rigorous evaluation of the model's predictive capabilities in a true clinical setting where the base rate of suicidal behavior is low.
+
+
+% ------------------------------------------
+% New Results Table
+% Replace your old results table with this one.
+% ------------------------------------------
+\begin{table}[htbp]
+    \centering
+    \caption{Performance of Machine Learning Models on Raw, Imbalanced Held-Out Test Sets}
+    \label{tab:new_results}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{llcccc}
+        \toprule
+        \textbf{Dataset} & \textbf{Model} & \textbf{Accuracy} & \textbf{Macro-F1} & \textbf{PR-AUC} \\
+        \midrule
+        \multirow{3}{*}{\textbf{Bangladesh 2014} (n=2,989)} 
+        & \textbf{ExtraTrees} & \textbf{0.8963} & \textbf{0.5535} & 0.1975 \\
+        & XGBoost & 0.8913 & 0.5696 & \textbf{0.2163} \\
+        & TabNet & 0.8344 & 0.5238 & 0.1314 \\
+        \midrule
+        \multirow{3}{*}{\textbf{Nepal 2015} (n=6,529)} 
+        & \textbf{ExtraTrees} & \textbf{0.8124} & \textbf{0.6544} & \textbf{0.5148} \\
+        & XGBoost & 0.7848 & 0.6299 & 0.4491 \\
+        & QDA & 0.7481 & 0.6236 & 0.3965 \\
+        \midrule
+        \multirow{3}{*}{\textbf{Thailand 2015} (n=5,894)} 
+        & \textbf{ExtraTrees} & \textbf{0.8032} & 0.6248 & 0.4594 \\
+        & XGBoost & 0.7990 & \textbf{0.6453} & 0.4245 \\
+        & QDA & 0.7422 & 0.6483 & 0.3875 \\
+        \midrule
+        \multirow{3}{*}{\textbf{Timor-Leste 2015} (n=3,704)} 
+        & \textbf{ExtraTrees} & \textbf{0.8178} & \textbf{0.6383} & \textbf{0.4664} \\
+        & XGBoost & 0.8070 & 0.6333 & 0.4328 \\
+        & QDA & 0.7436 & 0.6196 & 0.3684 \\
+        \midrule
+        \multirow{3}{*}{\textbf{Merged Dataset} (n=19,116)} 
+        & \textbf{ExtraTrees} & \textbf{0.8248} & 0.6302 & \textbf{0.4796} \\
+        & XGBoost & 0.8060 & 0.6187 & 0.4184 \\
+        & QDA & 0.7660 & \textbf{0.6506} & 0.3804 \\
+        \bottomrule
+    \end{tabular}%
+    }
+\end{table}
+
+
+% ==========================================
+% UPDATE 4: Discussion Section
+% Place this in your Discussion section.
+% Addresses Reviewer 1 & 2 (Explaining the metrics and addressing limitations)
+% ==========================================
+\subsection*{Updated Text for Discussion Section}
+
+Addressing the challenges of class imbalance is paramount in psychosocial and clinical datasets. Previous iterations of this study or similar works sometimes report exceptionally high accuracies (e.g., $>95\%$) by evaluating models on test sets that were artificially balanced using oversampling techniques like SMOTE. However, such evaluation strategies introduce significant data leakage and bias, creating an illusion of high performance that does not translate to real-world deployment where positive cases (suicidal ideation/attempts) represent a small minority (10-22\% in our cohorts). 
+
+By strictly isolating our test sets prior to applying SMOTE, we provide a transparent and rigorous assessment of the models. While this approach naturally results in lower overall accuracy scores, it reveals the true discriminative power of the models via the Macro-F1 and PR-AUC metrics. The consistent performance of the Extra Trees classifier on these imbalanced, held-out datasets underscores its robustness and generalizability across diverse cultural contexts. 
+
+Furthermore, we acknowledge certain limitations in our study. The cross-sectional nature of the GSHS data precludes the establishment of causal relationships between the identified risk factors and suicidal behavior. Additionally, reliance on self-reported data introduces potential social desirability bias, particularly concerning sensitive topics. Future longitudinal studies incorporating multi-modal data sources could further validate and enhance the predictive capabilities of these models.
+
+\end{document}

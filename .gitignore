@@ -29,3 +29,6 @@ __pycache__/
 
 # Excel files with data (optional)
 # *.xlsx
+*.joblib
+*.pkl
+*.log
